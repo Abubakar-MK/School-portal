@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Logo from '../../components/Logo';
+import school from '../../config/school';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
@@ -45,7 +46,7 @@ export default function LoginPage() {
         <div className="bg-maroon-dark py-6 flex flex-col items-center text-white">
           <Logo size={80} />
           <h1 className="mt-3 font-bold text-center text-sm px-6">
-            HIGHER GROUND COLLEGE OF HEALTH AND MANAGEMENT SCIENCES TAKUM
+            {school.fullName.toUpperCase()}
           </h1>
           <p className="text-xs text-gold-light">Student Result Management Portal</p>
         </div>

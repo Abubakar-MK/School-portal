@@ -39,18 +39,34 @@ export default function CoursesPage() {
     }
   };
 
-  // Group the flat course list into one block per department, sorted
-  // alphabetically, so the table reads like a curriculum book rather
-  // than one long undifferentiated list.
+  // Group the flat course list into one block per department, then a
+  // separate table per level within that department — so 100 L and 200 L
+  // (etc.) never share a table, even though they're the same department.
   const groupedByDepartment = useMemo(() => {
-    const groups = {};
+    const deptGroups = {};
     for (const c of courses) {
-      const key = c.department_name || 'Unassigned';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(c);
+      const deptKey = c.department_name || 'Unassigned';
+      if (!deptGroups[deptKey]) deptGroups[deptKey] = {};
+      const levelKey = c.level_name || 'Unassigned Level';
+      if (!deptGroups[deptKey][levelKey]) deptGroups[deptKey][levelKey] = [];
+      deptGroups[deptKey][levelKey].push(c);
     }
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [courses]);
+    // Order levels within each department the same way the Level… dropdown
+    // does (by sort_order), falling back to alphabetical for anything not
+    // found in the levels list.
+    const levelOrder = new Map(levels.map((l, i) => [l.name, i]));
+    const orderLevel = (a, b) => {
+      const ai = levelOrder.has(a) ? levelOrder.get(a) : Infinity;
+      const bi = levelOrder.has(b) ? levelOrder.get(b) : Infinity;
+      return ai !== bi ? ai - bi : a.localeCompare(b);
+    };
+    return Object.entries(deptGroups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([deptName, levelGroups]) => [
+        deptName,
+        Object.entries(levelGroups).sort(([a], [b]) => orderLevel(a, b)),
+      ]);
+  }, [courses, levels]);
 
   return (
     <DashboardLayout subtitle="Super Admin Portal">
@@ -92,28 +108,33 @@ export default function CoursesPage() {
           {groupedByDepartment.length === 0 && (
             <p className="text-gray-500 text-sm bg-white rounded shadow p-4">No courses added yet.</p>
           )}
-          {groupedByDepartment.map(([deptName, deptCourses]) => (
-            <div key={deptName} className="bg-white rounded shadow overflow-x-auto">
-              <div className="bg-gray-100 border-b px-4 py-2">
-                <h3 className="font-semibold text-maroon text-sm">{deptName}</h3>
-                <p className="text-xs text-gray-500">{deptCourses.length} course{deptCourses.length === 1 ? '' : 's'}</p>
-              </div>
-              <table className="w-full text-sm">
-                <thead className="bg-maroon text-white">
-                  <tr><Th>Code</Th><Th>Title</Th><Th>Unit</Th><Th>Programme</Th><Th>Level</Th><Th>Semester</Th><Th></Th></tr>
-                </thead>
-                <tbody>
-                  {deptCourses.map((c) => (
-                    <tr key={c.id} className="border-b">
-                      <Td>{c.code}</Td><Td>{c.title}</Td><Td>{c.credit_unit}</Td>
-                      <Td>{c.programme_name}</Td><Td>{c.level_name}</Td><Td>{c.semester}</Td>
-                      <Td>
-                        <button onClick={() => deleteCourse(c)} className="text-red-600 underline text-xs">Delete</button>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {groupedByDepartment.map(([deptName, levelGroups]) => (
+            <div key={deptName} className="space-y-3">
+              <h2 className="font-bold text-maroon">{deptName}</h2>
+              {levelGroups.map(([levelName, levelCourses]) => (
+                <div key={`${deptName}-${levelName}`} className="bg-white rounded shadow overflow-x-auto">
+                  <div className="bg-gray-100 border-b px-4 py-2">
+                    <h3 className="font-semibold text-gray-700 text-sm">{levelName}</h3>
+                    <p className="text-xs text-gray-500">{levelCourses.length} course{levelCourses.length === 1 ? '' : 's'}</p>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead className="bg-maroon text-white">
+                      <tr><Th>Code</Th><Th>Title</Th><Th>Unit</Th><Th>Programme</Th><Th>Level</Th><Th>Semester</Th><Th></Th></tr>
+                    </thead>
+                    <tbody>
+                      {levelCourses.map((c) => (
+                        <tr key={c.id} className="border-b">
+                          <Td>{c.code}</Td><Td>{c.title}</Td><Td>{c.credit_unit}</Td>
+                          <Td>{c.programme_name}</Td><Td>{c.level_name}</Td><Td>{c.semester}</Td>
+                          <Td>
+                            <button onClick={() => deleteCourse(c)} className="text-red-600 underline text-xs">Delete</button>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
             </div>
           ))}
         </div>

@@ -1,19 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../../api/axios';
 import DashboardLayout from '../../components/DashboardLayout';
 import Header from '../../components/Header';
 import { useAuth } from '../../context/AuthContext';
 import { useAcademicStructure } from '../../hooks/useAcademicStructure';
+import school from '../../config/school';
 
 export default function StudentsListPage() {
   const { user } = useAuth();
-  const { departments } = useAcademicStructure();
+  const { departments, levels } = useAcademicStructure();
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [editingStudent, setEditingStudent] = useState(null);
+  const [changingLevelStudent, setChangingLevelStudent] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -52,7 +54,7 @@ export default function StudentsListPage() {
         th { background: #7a1f2b; color: white; }
       </style></head>
       <body>
-        <h1>Higher Ground College of Health and Management Sciences Takum</h1>
+        <h1>${school.fullName}</h1>
         <p>Student List — ${deptName} (${students.length} student${students.length === 1 ? '' : 's'})</p>
         <table>
           <thead><tr><th>Matric No.</th><th>Name</th><th>Department</th><th>Programme</th><th>Level</th><th>Status</th><th>Phone</th></tr></thead>
@@ -135,6 +137,9 @@ export default function StudentsListPage() {
                     <div className="flex gap-2 flex-wrap">
                       <button onClick={() => setEditingStudent(s)} className="text-maroon underline text-xs">Edit</button>
                       {user.role === 'super_admin' && (
+                        <button onClick={() => setChangingLevelStudent(s)} className="text-maroon underline text-xs">Change Level</button>
+                      )}
+                      {user.role === 'super_admin' && (
                         <button onClick={() => resetPassword(s.id)} className="text-maroon underline text-xs">Reset Password</button>
                       )}
                       <button onClick={() => deleteStudent(s)} className="text-red-600 underline text-xs">Delete</button>
@@ -152,6 +157,15 @@ export default function StudentsListPage() {
           student={editingStudent}
           onClose={() => setEditingStudent(null)}
           onSaved={() => { setEditingStudent(null); setMessage('Student updated.'); load(); }}
+        />
+      )}
+
+      {changingLevelStudent && (
+        <ChangeLevelModal
+          student={changingLevelStudent}
+          levels={levels}
+          onClose={() => setChangingLevelStudent(null)}
+          onSaved={() => { setChangingLevelStudent(null); setMessage('Student\u2019s level updated.'); load(); }}
         />
       )}
     </DashboardLayout>
@@ -223,6 +237,60 @@ function EditStudentModal({ student, onClose, onSaved }) {
             <button type="button" onClick={onClose} className="flex-1 bg-gray-200 py-2 rounded text-sm">Cancel</button>
             <button disabled={saving} className="flex-1 bg-maroon text-white py-2 rounded text-sm font-semibold disabled:opacity-60">
               {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Lets a Super Admin move a student to a different level within the
+ * same department — e.g. promoting a batch from 100 L to 200 L, or
+ * fixing a level entered incorrectly at registration/bulk upload.
+ */
+function ChangeLevelModal({ student, levels, onClose, onSaved }) {
+  const [levelId, setLevelId] = useState(student.level_id || '');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      await api.patch(`/students/${student.id}`, { levelId });
+      onSaved();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not change level.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
+        <h3 className="font-bold text-maroon text-lg mb-1">Change Level</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          {student.first_name} {student.last_name} · {student.matric_number} · {student.department_name}
+        </p>
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600">New Level</label>
+            <select required value={levelId} onChange={(e) => setLevelId(e.target.value)} className="mt-1 w-full border rounded px-3 py-2 text-sm bg-white">
+              <option value="">Select…</option>
+              {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+
+          {error && <p className="text-red-600 text-xs">{error}</p>}
+
+          <div className="flex gap-2 mt-2">
+            <button type="button" onClick={onClose} className="flex-1 bg-gray-200 py-2 rounded text-sm">Cancel</button>
+            <button disabled={saving || !levelId} className="flex-1 bg-maroon text-white py-2 rounded text-sm font-semibold disabled:opacity-60">
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </form>

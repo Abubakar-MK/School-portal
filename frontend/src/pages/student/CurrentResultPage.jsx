@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../../api/axios';
 import DashboardLayout from '../../components/DashboardLayout';
 import Logo from '../../components/Logo';
+import school from '../../config/school';
 
 export default function CurrentResultPage() {
   const [history, setHistory] = useState([]);
@@ -47,7 +48,7 @@ export default function CurrentResultPage() {
             >
               {history.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.session_name} — {h.semester_name}
+                  {h.session_name} — {h.semester_name} ({h.level_name})
                 </option>
               ))}
             </select>
@@ -73,9 +74,9 @@ export default function CurrentResultPage() {
               <Logo size={64} />
               <div>
                 <h2 className="text-lg font-extrabold text-maroon">
-                  HIGHER GROUND COLLEGE OF HEALTH AND MANAGEMENT SCIENCES TAKUM
+                  {school.fullName.toUpperCase()}
                 </h2>
-                <p className="text-xs text-gray-500">No 8 High Level, Opposite Army Barracks Takum</p>
+                <p className="text-xs text-gray-500">{school.address}</p>
               </div>
             </div>
 

@@ -2,18 +2,19 @@ const { pool } = require('../config/db');
 const { logAction } = require('../utils/audit');
 
 async function listCourses(req, res) {
-  const { programmeId, levelId, semester } = req.query;
+  const { departmentId, programmeId, levelId, semester } = req.query;
   const { rows } = await pool.query(
-    `SELECT c.*, p.name AS programme_name, l.name AS level_name, d.name AS department_name
+    `SELECT c.*, p.name AS programme_name, l.name AS level_name, l.sort_order AS level_sort_order, d.name AS department_name
      FROM courses c
      JOIN programmes p ON p.id = c.programme_id
      JOIN levels l ON l.id = c.level_id
      JOIN departments d ON d.id = c.department_id
-     WHERE ($1::uuid IS NULL OR c.programme_id = $1)
-       AND ($2::uuid IS NULL OR c.level_id = $2)
-       AND ($3::text IS NULL OR c.semester::text = $3)
-     ORDER BY c.code`,
-    [programmeId || null, levelId || null, semester || null]
+     WHERE ($1::uuid IS NULL OR c.department_id = $1)
+       AND ($2::uuid IS NULL OR c.programme_id = $2)
+       AND ($3::uuid IS NULL OR c.level_id = $3)
+       AND ($4::text IS NULL OR c.semester::text = $4)
+     ORDER BY l.sort_order, c.semester, c.code`,
+    [departmentId || null, programmeId || null, levelId || null, semester || null]
   );
   res.json(rows);
 }

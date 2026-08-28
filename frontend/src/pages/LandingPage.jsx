@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
+import school from '../config/school';
 
 /**
  * Public marketing/landing page shown at "/" for anyone not logged in.
@@ -35,9 +36,9 @@ export default function LandingPage() {
           <Logo size={scrolled ? 44 : 64} className="transition-all duration-200" />
           <div>
             <h1 className={`text-maroon font-extrabold leading-tight transition-all duration-200 ${scrolled ? 'text-sm md:text-base' : 'text-base md:text-xl'}`}>
-              HIGHER GROUND COLLEGE OF<br className="hidden md:block" /> HEALTH AND MANAGEMENT SCIENCES TAKUM
+              {school.fullName.toUpperCase()}
             </h1>
-            {!scrolled && <p className="text-xs md:text-sm text-gray-500">No 8 High Level, Opposite Army Barracks Takum</p>}
+            {!scrolled && <p className="text-xs md:text-sm text-gray-500">{school.address}</p>}
           </div>
         </div>
         <nav className="flex items-center gap-6 text-sm font-semibold text-gray-700">
@@ -59,7 +60,11 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-2 gap-8 px-6 md:px-10 py-12 items-center max-w-7xl mx-auto">
           <div>
             <p className="text-gold font-bold tracking-wide text-sm mb-1">WELCOME TO</p>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-maroon leading-tight mb-3">Higher Ground College of<br />Health and Management Sciences Takum</h2>
+            <h2 className="text-4xl md:text-5xl font-extrabold text-maroon leading-tight mb-3">
+              {school.heroHeadingLines.map((line, i) => (
+                <span key={i}>{line}{i < school.heroHeadingLines.length - 1 && <br />}</span>
+              ))}
+            </h2>
             <p className="text-xl font-semibold text-gray-700 mb-4">Student Result Management System</p>
             <p className="text-gray-600 mb-6 max-w-md">
               A secure, reliable and efficient platform for managing academic results and student information.
@@ -95,8 +100,8 @@ export default function LandingPage() {
           <div className="relative rounded-xl overflow-hidden shadow-xl bg-gradient-to-br from-maroon-dark via-maroon to-gold h-72 md:h-96 flex items-center justify-center">
             <div className="text-center text-white px-6">
               <IconBuilding />
-              <p className="mt-4 font-semibold text-gold-light">HIGCHEMS Takum Campus</p>
-              <p className="text-xs text-white/70 mt-1">No 8 High Level, Opposite Army Barracks Takum</p>
+              <p className="mt-4 font-semibold text-gold-light">{school.shortName} Campus</p>
+              <p className="text-xs text-white/70 mt-1">{school.address}</p>
             </div>
           </div>
         </div>
@@ -160,19 +165,20 @@ export default function LandingPage() {
       <footer id="contact" className="bg-maroon-dark text-white px-6 md:px-10 py-8 scroll-mt-24">
         <div className="max-w-7xl mx-auto flex flex-wrap gap-6 justify-between items-start text-sm">
           <div className="flex items-start gap-2 max-w-xs">
-            <IconPin /> <span>No 8 High Level, Opposite Army Barracks Takum</span>
+            <IconPin /> <span>{school.address}</span>
           </div>
           <div className="flex items-start gap-2">
-            <IconPhoneOutline /> <span>0806 419 4677<br />0803 818 0217<br />0906 029 6881</span>
+            <IconPhoneOutline />
+            <span>{school.phones.map((ph, i) => <span key={ph}>{ph}{i < school.phones.length - 1 && <br />}</span>)}</span>
           </div>
           <div className="flex items-start gap-2">
-            <IconMail /> <span>higchemstakum@gmai.com</span>
+            <IconMail /> <span>{school.email}</span>
           </div>
           <div className="flex items-start gap-2">
-            <IconGlobe /> <a href="https://www.higchems.com" className="hover:underline">www.higchems.com</a>
+            <IconGlobe /> <a href={school.websiteUrl} className="hover:underline">{school.website}</a>
           </div>
           <div className="text-white/70 text-xs max-w-xs">
-            © {new Date().getFullYear()} Higher Ground College of Health and Management Sciences Takum. All Rights Reserved.
+            © {new Date().getFullYear()} {school.copyrightName}. All Rights Reserved.
           </div>
         </div>
       </footer>

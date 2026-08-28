@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import school from './config/school';
 
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
@@ -34,6 +36,12 @@ function HomeRedirect() {
 }
 
 export default function App() {
+  // Sets the browser tab title from the one central school config
+  // file, so a rebrand only ever needs school.js edited, not index.html.
+  useEffect(() => {
+    document.title = school.browserTitle;
+  }, []);
+
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />

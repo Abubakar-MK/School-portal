@@ -5,8 +5,10 @@ import Header from '../../components/Header';
 import { useAcademicStructure } from '../../hooks/useAcademicStructure';
 
 export default function ResultEntryPage() {
-  const { sessions, semestersFor } = useAcademicStructure();
+  const { departments, levels, sessions, semestersFor } = useAcademicStructure();
   const [matric, setMatric] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
+  const [levelId, setLevelId] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [semesterId, setSemesterId] = useState('');
   const [student, setStudent] = useState(null);
@@ -16,6 +18,18 @@ export default function ResultEntryPage() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Fetches the exact course list for whatever Department + Level +
+  // Semester is currently selected. Called after a student loads (using
+  // their own department/level), and again any time the admin changes
+  // Department or Level afterward, so the course list always matches
+  // exactly what's showing in the three dropdowns above it.
+  const loadCourses = async (deptId, lvlId, semId) => {
+    const { data: courseList } = await api.get('/courses', {
+      params: { departmentId: deptId, levelId: lvlId, semester: semestersFor(sessionId).find((s) => s.id === semId)?.name },
+    });
+    setCourses(courseList);
+  };
 
   const findStudent = async () => {
     setError(''); setInfo(''); setStudent(null); setResult(null); setCourses([]);
@@ -28,16 +42,17 @@ export default function ResultEntryPage() {
       const match = list.find((s) => s.matric_number.toLowerCase() === matric.trim().toLowerCase());
       if (!match) { setError('No student found with that matriculation number.'); return; }
       setStudent(match);
+      // Reflect the student's own Department/Level in the dropdowns above,
+      // so what you see there is exactly what determined their course list.
+      setDepartmentId(match.department_id);
+      setLevelId(match.level_id);
 
       const { data: draft } = await api.post('/results/drafts', {
         studentId: match.id, sessionId, semesterId, levelId: match.level_id,
       });
       setResult(draft);
 
-      const { data: courseList } = await api.get('/courses', {
-        params: { programmeId: match.programme_id, levelId: match.level_id },
-      });
-      setCourses(courseList);
+      await loadCourses(match.department_id, match.level_id, semesterId);
 
       if (draft.id) {
         const { data: detail } = await api.get(`/results/${draft.id}`);
@@ -52,6 +67,21 @@ export default function ResultEntryPage() {
 
   const setScore = (courseId, field, value) => {
     setScores((s) => ({ ...s, [courseId]: { ...s[courseId], [field]: value } }));
+  };
+
+  // Lets the admin override Department/Level after a student is loaded —
+  // e.g. to double-check against a different level's course list. Only
+  // re-fetches the course list; it does not change the student's own
+  // record (use "Change Level" on the Students page for that).
+  const changeDepartment = async (e) => {
+    const value = e.target.value;
+    setDepartmentId(value);
+    if (value && levelId && semesterId) await loadCourses(value, levelId, semesterId);
+  };
+  const changeLevel = async (e) => {
+    const value = e.target.value;
+    setLevelId(value);
+    if (departmentId && value && semesterId) await loadCourses(departmentId, value, semesterId);
   };
 
   const saveEntry = async (courseId) => {
@@ -96,6 +126,20 @@ export default function ResultEntryPage() {
             <input value={matric} onChange={(e) => setMatric(e.target.value)} className="block border rounded px-3 py-2 text-sm w-56" />
           </div>
           <div>
+            <label className="text-xs font-medium text-gray-600">Department</label>
+            <select value={departmentId} onChange={changeDepartment} className="block border rounded px-3 py-2 text-sm w-48 bg-white">
+              <option value="">Select…</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600">Level</label>
+            <select value={levelId} onChange={changeLevel} className="block border rounded px-3 py-2 text-sm w-36 bg-white">
+              <option value="">Select…</option>
+              {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="text-xs font-medium text-gray-600">Academic Session</label>
             <select value={sessionId} onChange={(e) => { setSessionId(e.target.value); setSemesterId(''); }} className="block border rounded px-3 py-2 text-sm w-48 bg-white">
               <option value="">Select…</option>
@@ -111,6 +155,9 @@ export default function ResultEntryPage() {
           </div>
           <button onClick={findStudent} className="bg-maroon text-white px-4 py-2 rounded text-sm font-semibold">Load</button>
         </div>
+        <p className="text-xs text-gray-500 -mt-4 mb-6">
+          Department and Level fill in automatically from the student\u2019s own record once loaded \u2014 change them here only to double-check against a different department/level\u2019s course list.
+        </p>
 
         {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
         {info && <p className="text-green-600 text-sm mb-3">{info}</p>}
@@ -153,7 +200,7 @@ export default function ResultEntryPage() {
                     </Td>
                   </tr>
                 ))}
-                {courses.length === 0 && <tr><td colSpan={5} className="p-3 text-gray-500">No courses configured for this programme/level yet.</td></tr>}
+                {courses.length === 0 && <tr><td colSpan={5} className="p-3 text-gray-500">No courses configured for this department/level/semester yet.</td></tr>}
               </tbody>
             </table>
 

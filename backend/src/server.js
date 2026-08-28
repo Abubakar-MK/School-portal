@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/authRoutes');
@@ -40,15 +41,19 @@ app.use('/api/dashboard', dashboardRoutes);
 // 404
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
-// Serve the built frontend (npm run build in /frontend) so the whole
-// site — pages and API — can be reached through a single port. This is
-// what lets one ngrok tunnel show the entire app to someone outside
-// your network, instead of two tunnels and CORS/localhost problems.
+// Serve the built frontend (npm run build in /frontend) ONLY if it's
+// actually present next to this backend — e.g. a local single-port
+// setup (like sharing one ngrok tunnel for a quick client review).
+// On Render, backend and frontend are deployed as two separate
+// services, so this folder never exists there and is safely skipped —
+// the live frontend has its own separate address instead.
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
-app.use(express.static(frontendDist));
-app.get(/^(?!\/api).*/, (_req, res) => {
-  res.sendFile(path.join(frontendDist, 'index.html'));
-});
+if (fs.existsSync(path.join(frontendDist, 'index.html'))) {
+  app.use(express.static(frontendDist));
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 // Central error handler — never leak stack traces to the client.
 // eslint-disable-next-line no-unused-vars

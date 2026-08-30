@@ -175,13 +175,15 @@ export default function ResultEntryPage() {
             <table className="w-full text-sm mb-4">
               <thead>
                 <tr className="bg-gray-100">
-                  <Th>Course</Th><Th>Unit</Th><Th>CA (30)</Th><Th>Exam (70)</Th><Th></Th>
+                  <Th>Course</Th><Th>Dept.</Th><Th>Semester</Th><Th>Unit</Th><Th>CA (30)</Th><Th>Exam (70)</Th><Th></Th>
                 </tr>
               </thead>
               <tbody>
                 {courses.map((c) => (
                   <tr key={c.id} className="border-b">
                     <Td>{c.code} — {c.title}</Td>
+                    <Td className="text-xs text-gray-500">{c.department_name}</Td>
+                    <Td className="text-xs text-gray-500">{c.semester}</Td>
                     <Td>{c.credit_unit}</Td>
                     <Td>
                       <input type="number" min="0" max="30" disabled={!editable}
@@ -200,7 +202,7 @@ export default function ResultEntryPage() {
                     </Td>
                   </tr>
                 ))}
-                {courses.length === 0 && <tr><td colSpan={5} className="p-3 text-gray-500">No courses configured for this department/level/semester yet.</td></tr>}
+                {courses.length === 0 && <tr><td colSpan={7} className="p-3 text-gray-500">No courses configured for this department/level/semester yet.</td></tr>}
               </tbody>
             </table>
 
@@ -219,4 +221,4 @@ export default function ResultEntryPage() {
 }
 
 function Th({ children }) { return <th className="text-left px-2 py-2 text-xs">{children}</th>; }
-function Td({ children }) { return <td className="px-2 py-1.5">{children}</td>; }
+function Td({ children, className = '' }) { return <td className={`px-2 py-1.5 ${className}`}>{children}</td>; }

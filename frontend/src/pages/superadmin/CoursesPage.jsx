@@ -39,34 +39,30 @@ export default function CoursesPage() {
     }
   };
 
-  // Group the flat course list into one block per department, then a
-  // separate table per level within that department — so 100 L and 200 L
-  // (etc.) never share a table, even though they're the same department.
+  // Group into Department > Level > Semester, each combination getting
+  // its own small table. The course list already arrives sorted by
+  // level order then semester then code, so grouping just buckets rows
+  // in the order they arrive rather than needing to re-sort here.
   const groupedByDepartment = useMemo(() => {
     const deptGroups = {};
     for (const c of courses) {
       const deptKey = c.department_name || 'Unassigned';
       if (!deptGroups[deptKey]) deptGroups[deptKey] = {};
       const levelKey = c.level_name || 'Unassigned Level';
-      if (!deptGroups[deptKey][levelKey]) deptGroups[deptKey][levelKey] = [];
-      deptGroups[deptKey][levelKey].push(c);
+      if (!deptGroups[deptKey][levelKey]) deptGroups[deptKey][levelKey] = {};
+      const semKey = c.semester || 'Unassigned Semester';
+      if (!deptGroups[deptKey][levelKey][semKey]) deptGroups[deptKey][levelKey][semKey] = [];
+      deptGroups[deptKey][levelKey][semKey].push(c);
     }
-    // Order levels within each department the same way the Level… dropdown
-    // does (by sort_order), falling back to alphabetical for anything not
-    // found in the levels list.
-    const levelOrder = new Map(levels.map((l, i) => [l.name, i]));
-    const orderLevel = (a, b) => {
-      const ai = levelOrder.has(a) ? levelOrder.get(a) : Infinity;
-      const bi = levelOrder.has(b) ? levelOrder.get(b) : Infinity;
-      return ai !== bi ? ai - bi : a.localeCompare(b);
-    };
-    return Object.entries(deptGroups)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([deptName, levelGroups]) => [
-        deptName,
-        Object.entries(levelGroups).sort(([a], [b]) => orderLevel(a, b)),
-      ]);
-  }, [courses, levels]);
+    return Object.entries(deptGroups).sort(([a], [b]) => a.localeCompare(b)).map(([deptName, levelGroups]) => ({
+      deptName,
+      totalCount: Object.values(levelGroups).reduce((sum, sems) => sum + Object.values(sems).reduce((s2, arr) => s2 + arr.length, 0), 0),
+      levels: Object.entries(levelGroups).map(([levelName, semGroups]) => ({
+        levelName,
+        semesters: Object.entries(semGroups), // already in arrival order = correct semester order
+      })),
+    }));
+  }, [courses]);
 
   return (
     <DashboardLayout subtitle="Super Admin Portal">
@@ -103,38 +99,46 @@ export default function CoursesPage() {
           <button className="w-full bg-maroon text-white py-2 rounded font-semibold text-sm">Add Course</button>
         </form>
 
-        <div className="col-span-2 space-y-6">
+        <div className="col-span-2 space-y-8">
           {error && <p className="text-red-600 text-sm">{error}</p>}
           {groupedByDepartment.length === 0 && (
             <p className="text-gray-500 text-sm bg-white rounded shadow p-4">No courses added yet.</p>
           )}
-          {groupedByDepartment.map(([deptName, levelGroups]) => (
-            <div key={deptName} className="space-y-3">
-              <h2 className="font-bold text-maroon">{deptName}</h2>
-              {levelGroups.map(([levelName, levelCourses]) => (
-                <div key={`${deptName}-${levelName}`} className="bg-white rounded shadow overflow-x-auto">
-                  <div className="bg-gray-100 border-b px-4 py-2">
-                    <h3 className="font-semibold text-gray-700 text-sm">{levelName}</h3>
-                    <p className="text-xs text-gray-500">{levelCourses.length} course{levelCourses.length === 1 ? '' : 's'}</p>
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead className="bg-maroon text-white">
-                      <tr><Th>Code</Th><Th>Title</Th><Th>Unit</Th><Th>Programme</Th><Th>Level</Th><Th>Semester</Th><Th></Th></tr>
-                    </thead>
-                    <tbody>
-                      {levelCourses.map((c) => (
-                        <tr key={c.id} className="border-b">
-                          <Td>{c.code}</Td><Td>{c.title}</Td><Td>{c.credit_unit}</Td>
-                          <Td>{c.programme_name}</Td><Td>{c.level_name}</Td><Td>{c.semester}</Td>
-                          <Td>
-                            <button onClick={() => deleteCourse(c)} className="text-red-600 underline text-xs">Delete</button>
-                          </Td>
-                        </tr>
+          {groupedByDepartment.map(({ deptName, totalCount, levels: levelGroups }) => (
+            <div key={deptName}>
+              <h2 className="font-bold text-maroon mb-3">{deptName} <span className="font-normal text-gray-400 text-sm">— {totalCount} course{totalCount === 1 ? '' : 's'}</span></h2>
+              <div className="space-y-4 pl-1">
+                {levelGroups.map(({ levelName, semesters }) => (
+                  <div key={levelName}>
+                    <h3 className="font-semibold text-gray-700 text-sm mb-2">{levelName}</h3>
+                    <div className="space-y-3 pl-1">
+                      {semesters.map(([semName, semCourses]) => (
+                        <div key={semName} className="bg-white rounded shadow overflow-x-auto">
+                          <div className="bg-gray-100 border-b px-4 py-2">
+                            <p className="text-xs font-medium text-gray-600">{semName} · {semCourses.length} course{semCourses.length === 1 ? '' : 's'}</p>
+                          </div>
+                          <table className="w-full text-sm">
+                            <thead className="bg-maroon text-white">
+                              <tr><Th>Code</Th><Th>Title</Th><Th>Unit</Th><Th>Programme</Th><Th></Th></tr>
+                            </thead>
+                            <tbody>
+                              {semCourses.map((c) => (
+                                <tr key={c.id} className="border-b">
+                                  <Td>{c.code}</Td><Td>{c.title}</Td><Td>{c.credit_unit}</Td>
+                                  <Td>{c.programme_name}</Td>
+                                  <Td>
+                                    <button onClick={() => deleteCourse(c)} className="text-red-600 underline text-xs">Delete</button>
+                                  </Td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

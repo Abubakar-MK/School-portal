@@ -91,6 +91,28 @@ async function saveEntry(req, res) {
   res.json({ entry: rows[0], totals });
 }
 
+/**
+ * Removes one course from a draft/rejected (or, for a Super Admin,
+ * approved-but-unpublished) result — e.g. dropping a course that
+ * shouldn't apply to a specific carry-over student. Uses the same
+ * editable-status rule as saveEntry, so it can never touch a
+ * submitted, approved-by-admin, or published result.
+ */
+async function deleteEntry(req, res) {
+  const { resultId, courseId } = req.params;
+  const { rows: resultRows } = await pool.query('SELECT * FROM results WHERE id = $1', [resultId]);
+  const result = resultRows[0];
+  if (!result) return res.status(404).json({ error: 'Result not found.' });
+  const editableStatuses = req.user.role === 'super_admin'
+    ? ['draft', 'rejected', 'approved']
+    : ['draft', 'rejected'];
+  if (!editableStatuses.includes(result.status)) {
+    return res.status(409).json({ error: 'This result can no longer be edited.' });
+  }
+  await pool.query('DELETE FROM result_entries WHERE result_id = $1 AND course_id = $2', [resultId, courseId]);
+  res.json({ message: 'Course removed from this result.' });
+}
+
 async function getResultDetail(req, res) {
   const { rows: headerRows } = await pool.query(`${RESULT_HEADER_SELECT} WHERE r.id = $1`, [req.params.id]);
   const header = headerRows[0];
@@ -268,7 +290,7 @@ async function getMyResultById(req, res) {
 }
 
 module.exports = {
-  getOrCreateDraft, saveEntry, getResultDetail, listResults,
+  getOrCreateDraft, saveEntry, deleteEntry, getResultDetail, listResults,
   submitResult, approveResult, approveAllSubmitted, rejectResult,
   publishResult, publishAllApproved, unpublishResult,
   getMyCurrentResult, getMyResultHistory, getMyResultById,

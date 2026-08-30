@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../../api/axios';
 import DashboardLayout from '../../components/DashboardLayout';
 import Header from '../../components/Header';
@@ -14,10 +14,16 @@ export default function ResultEntryPage() {
   const [student, setStudent] = useState(null);
   const [result, setResult] = useState(null);
   const [courses, setCourses] = useState([]);
+  // Courses added on top of the normal Department/Level/Semester list —
+  // e.g. a carry-over course from an earlier level. Kept separate so
+  // they display and save exactly like any other row, but don't vanish
+  // or get confused with the auto-loaded curriculum list.
+  const [extraCourses, setExtraCourses] = useState([]);
   const [scores, setScores] = useState({}); // courseId -> { ca, exam }
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showAddCourse, setShowAddCourse] = useState(false);
 
   // Fetches the exact course list for whatever Department + Level +
   // Semester is currently selected. Called after a student loads (using
@@ -29,10 +35,11 @@ export default function ResultEntryPage() {
       params: { departmentId: deptId, levelId: lvlId, semester: semestersFor(sessionId).find((s) => s.id === semId)?.name },
     });
     setCourses(courseList);
+    return courseList;
   };
 
   const findStudent = async () => {
-    setError(''); setInfo(''); setStudent(null); setResult(null); setCourses([]);
+    setError(''); setInfo(''); setStudent(null); setResult(null); setCourses([]); setExtraCourses([]);
     if (!matric || !sessionId || !semesterId) {
       setError('Enter matric number and select session + semester first.');
       return;
@@ -52,13 +59,23 @@ export default function ResultEntryPage() {
       });
       setResult(draft);
 
-      await loadCourses(match.department_id, match.level_id, semesterId);
+      const loadedCourses = await loadCourses(match.department_id, match.level_id, semesterId);
 
       if (draft.id) {
         const { data: detail } = await api.get(`/results/${draft.id}`);
         const scoreMap = {};
         detail.entries.forEach((e) => { scoreMap[e.course_id] = { ca: e.ca_score, exam: e.exam_score }; });
         setScores(scoreMap);
+
+        // Any saved entry whose course isn't in the normal curriculum
+        // list must be a previously-added carry-over course — show it
+        // too, so it doesn't silently disappear on reload.
+        const loadedIds = new Set((loadedCourses || []).map((c) => c.id));
+        const carryOverIds = detail.entries.map((e) => e.course_id).filter((id) => !loadedIds.has(id));
+        if (carryOverIds.length > 0) {
+          const { data: allCourses } = await api.get('/courses');
+          setExtraCourses(allCourses.filter((c) => carryOverIds.includes(c.id)));
+        }
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Could not load result draft.');
@@ -98,6 +115,35 @@ export default function ResultEntryPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const removeEntry = async (courseId, isExtra) => {
+    if (!window.confirm('Remove this course from the student\u2019s result? Any saved score for it will be deleted.')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.delete(`/results/${result.id}/entries/${courseId}`);
+      setScores((s) => {
+        const next = { ...s };
+        delete next[courseId];
+        return next;
+      });
+      if (isExtra) setExtraCourses((list) => list.filter((c) => c.id !== courseId));
+      setInfo('Course removed.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not remove course.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addCarryOverCourse = (course) => {
+    if (courses.some((c) => c.id === course.id) || extraCourses.some((c) => c.id === course.id)) {
+      setError('That course is already in this result.');
+      return;
+    }
+    setExtraCourses((list) => [...list, course]);
+    setShowAddCourse(false);
   };
 
   const submitResult = async () => {
@@ -175,7 +221,7 @@ export default function ResultEntryPage() {
             <table className="w-full text-sm mb-4">
               <thead>
                 <tr className="bg-gray-100">
-                  <Th>Course</Th><Th>Dept.</Th><Th>Semester</Th><Th>Unit</Th><Th>CA (30)</Th><Th>Exam (70)</Th><Th></Th>
+                  <Th>Course</Th><Th>Dept.</Th><Th>Semester</Th><Th>Unit</Th><Th>CA (30)</Th><Th>Exam (70)</Th><Th></Th><Th></Th>
                 </tr>
               </thead>
               <tbody>
@@ -200,11 +246,52 @@ export default function ResultEntryPage() {
                         Save
                       </button>
                     </Td>
+                    <Td>
+                      <button disabled={!editable || busy} onClick={() => removeEntry(c.id, false)} className="text-red-600 underline text-xs disabled:opacity-40">
+                        Delete
+                      </button>
+                    </Td>
                   </tr>
                 ))}
-                {courses.length === 0 && <tr><td colSpan={7} className="p-3 text-gray-500">No courses configured for this department/level/semester yet.</td></tr>}
+                {extraCourses.map((c) => (
+                  <tr key={c.id} className="border-b bg-gold-light/10">
+                    <Td>{c.code} — {c.title} <span className="text-xs text-gold-dark font-semibold">(carry-over)</span></Td>
+                    <Td className="text-xs text-gray-500">{c.department_name}</Td>
+                    <Td className="text-xs text-gray-500">{c.semester}</Td>
+                    <Td>{c.credit_unit}</Td>
+                    <Td>
+                      <input type="number" min="0" max="30" disabled={!editable}
+                        value={scores[c.id]?.ca ?? ''} onChange={(e) => setScore(c.id, 'ca', e.target.value)}
+                        className="w-20 border rounded px-2 py-1" />
+                    </Td>
+                    <Td>
+                      <input type="number" min="0" max="70" disabled={!editable}
+                        value={scores[c.id]?.exam ?? ''} onChange={(e) => setScore(c.id, 'exam', e.target.value)}
+                        className="w-20 border rounded px-2 py-1" />
+                    </Td>
+                    <Td>
+                      <button disabled={!editable || busy} onClick={() => saveEntry(c.id)} className="text-maroon underline text-xs disabled:opacity-40">
+                        Save
+                      </button>
+                    </Td>
+                    <Td>
+                      <button disabled={!editable || busy} onClick={() => removeEntry(c.id, true)} className="text-red-600 underline text-xs disabled:opacity-40">
+                        Delete
+                      </button>
+                    </Td>
+                  </tr>
+                ))}
+                {courses.length === 0 && extraCourses.length === 0 && (
+                  <tr><td colSpan={8} className="p-3 text-gray-500">No courses configured for this department/level/semester yet.</td></tr>
+                )}
               </tbody>
             </table>
+
+            {editable && (
+              <button onClick={() => setShowAddCourse(true)} className="mb-4 border border-maroon text-maroon px-4 py-2 rounded text-sm font-semibold hover:bg-maroon/5">
+                + Add Course (carry-over)
+              </button>
+            )}
 
             {editable && (
               <button disabled={busy} onClick={submitResult} className="bg-maroon hover:bg-maroon-light text-white px-5 py-2 rounded text-sm font-semibold disabled:opacity-60">
@@ -215,8 +302,55 @@ export default function ResultEntryPage() {
             {result.status === 'rejected' && <p className="text-sm text-red-600">This result was rejected: {result.rejection_reason}. Correct scores above and resubmit.</p>}
           </div>
         )}
+
+        {showAddCourse && (
+          <AddCourseModal onPick={addCarryOverCourse} onClose={() => setShowAddCourse(false)} />
+        )}
       </div>
     </DashboardLayout>
+  );
+}
+
+/** Lets an admin search the FULL course catalog (any department/level) to add a carry-over course to this result. */
+function AddCourseModal({ onPick, onClose }) {
+  const [all, setAll] = useState(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    api.get('/courses').then(({ data }) => setAll(data));
+  }, []);
+
+  const filtered = (all || []).filter((c) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[80vh] flex flex-col">
+        <h3 className="font-bold text-maroon text-lg mb-1">Add Carry-Over Course</h3>
+        <p className="text-xs text-gray-500 mb-3">Search any course in the catalog, from any department or level.</p>
+        <input
+          autoFocus
+          placeholder="Search by code or title…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full border rounded px-3 py-2 text-sm mb-3"
+        />
+        <div className="overflow-y-auto flex-1 border rounded divide-y">
+          {all === null && <p className="p-3 text-sm text-gray-500">Loading…</p>}
+          {all !== null && filtered.length === 0 && <p className="p-3 text-sm text-gray-500">No matching courses.</p>}
+          {filtered.map((c) => (
+            <button key={c.id} onClick={() => onPick(c)} className="w-full text-left p-3 hover:bg-gray-50 text-sm">
+              <div className="font-medium">{c.code} — {c.title}</div>
+              <div className="text-xs text-gray-500">{c.department_name} · {c.level_name} · {c.semester} · {c.credit_unit} unit(s)</div>
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} className="mt-4 bg-gray-200 px-4 py-2 rounded text-sm self-start">Close</button>
+      </div>
+    </div>
   );
 }
 

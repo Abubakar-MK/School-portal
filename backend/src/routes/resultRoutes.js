@@ -13,6 +13,7 @@ router.get('/student/me/:resultId', requireRole('student'), requireOwnStudentRec
 // ---------- Admin: entry & submission ----------
 router.post('/drafts', requireRole('admin', 'super_admin'), ctrl.getOrCreateDraft);
 router.post('/:resultId/entries', requireRole('admin', 'super_admin'), ctrl.saveEntry);
+router.delete('/:resultId/entries/:courseId', requireRole('admin', 'super_admin'), ctrl.deleteEntry);
 router.post('/:id/submit', requireRole('admin', 'super_admin'), ctrl.submitResult);
 
 // ---------- Shared read (admin + super admin) ----------

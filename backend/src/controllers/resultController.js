@@ -237,6 +237,23 @@ async function unpublishResult(req, res) {
 // ---------------------------------------------------------------
 
 /** The student's current (most recent published) result. No score column. */
+const RESULT_VIEW_FEE = Number(process.env.RESULT_VIEW_FEE_NGN || 2200);
+
+/**
+ * Shapes a result response for the student: while access_granted is
+ * false, the grade/GPA data is withheld entirely (only enough identity
+ * info to show a "confirm this is you, then pay" screen is returned) —
+ * so a locked result never leaks its scores over the network even if
+ * the frontend were bypassed.
+ */
+function shapeForStudent(header, entries) {
+  if (!header.access_granted) {
+    const { gpa, cgpa, total_credit_units, total_quality_points, academic_standing, ...safeHeader } = header;
+    return { ...safeHeader, locked: true, fee: RESULT_VIEW_FEE, entries: [] };
+  }
+  return { ...header, locked: false, entries };
+}
+
 async function getMyCurrentResult(req, res) {
   const { rows: headerRows } = await pool.query(
     `${RESULT_HEADER_SELECT} WHERE r.student_id = $1 AND r.status = 'published'
@@ -253,7 +270,7 @@ async function getMyCurrentResult(req, res) {
      WHERE re.result_id = $1 ORDER BY c.code`,
     [header.id]
   );
-  res.json({ ...header, entries });
+  res.json(shapeForStudent(header, entries));
 }
 
 /** All of the student's own published results (result history). */
@@ -286,7 +303,7 @@ async function getMyResultById(req, res) {
      WHERE re.result_id = $1 ORDER BY c.code`,
     [header.id]
   );
-  res.json({ ...header, entries });
+  res.json(shapeForStudent(header, entries));
 }
 
 module.exports = {

@@ -10,15 +10,25 @@ export default function CurrentResultPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
 
   // Load the list of published semesters first, then default to the
-  // most recent one (their "current" result).
+  // most recent one (their "current" result) — unless we're returning
+  // from a payment for a specific one, in which case reselect that.
   useEffect(() => {
     api.get('/results/student/me/history')
       .then((res) => {
         setHistory(res.data);
-        if (res.data.length > 0) setSelectedId(res.data[0].id);
-        else setError('No published result is available yet.');
+        const pending = sessionStorage.getItem('resultViewSelected');
+        if (pending && res.data.some((h) => h.id === pending)) {
+          setSelectedId(pending);
+        } else if (res.data.length > 0) {
+          setSelectedId(res.data[0].id);
+        } else {
+          setError('No published result is available yet.');
+        }
+        sessionStorage.removeItem('resultViewSelected');
       })
       .catch((err) => setError(err.response?.data?.error || 'Could not load your results.'))
       .finally(() => setLoading(false));
@@ -27,11 +37,28 @@ export default function CurrentResultPage() {
   useEffect(() => {
     if (!selectedId) return;
     setLoading(true);
+    setPayError('');
     api.get(`/results/student/me/${selectedId}`)
       .then((res) => setResult(res.data))
       .catch((err) => setError(err.response?.data?.error || 'Could not load result.'))
       .finally(() => setLoading(false));
   }, [selectedId]);
+
+  const payNow = async () => {
+    setPaying(true);
+    setPayError('');
+    try {
+      sessionStorage.setItem('resultViewSelected', selectedId);
+      const { data } = await api.post('/payments/initiate', {
+        resultId: selectedId,
+        callbackUrl: `${window.location.origin}/student/payment-callback`,
+      });
+      window.location.href = data.authorizationUrl;
+    } catch (err) {
+      setPayError(err.response?.data?.error || 'Could not start payment. Please try again.');
+      setPaying(false);
+    }
+  };
 
   return (
     <DashboardLayout subtitle="Student Portal">
@@ -53,7 +80,7 @@ export default function CurrentResultPage() {
               ))}
             </select>
           )}
-          {result && (
+          {result && !result.locked && (
             <button
               onClick={() => window.print()}
               className="bg-maroon hover:bg-maroon-light text-white px-5 py-2 rounded font-semibold text-sm"
@@ -68,7 +95,37 @@ export default function CurrentResultPage() {
         {loading && <p>Loading…</p>}
         {error && <p className="text-red-600">{error}</p>}
 
-        {result && (
+        {result && result.locked && (
+          <div className="max-w-md mx-auto bg-white shadow border rounded-lg p-8 text-center">
+            <Logo size={56} className="mx-auto mb-3" />
+            <h2 className="font-bold text-maroon text-lg mb-1">Confirm Your Details</h2>
+            <p className="text-sm text-gray-500 mb-5">Please confirm this is you before paying to view this result.</p>
+
+            <div className="bg-gray-50 rounded p-4 text-left text-sm mb-5 space-y-1">
+              <Row label="Name" value={`${result.first_name} ${result.last_name}`} />
+              <Row label="Matriculation Number" value={result.matric_number} />
+              <Row label="Session" value={result.session_name} />
+              <Row label="Semester" value={result.semester_name} />
+              <Row label="Level" value={result.level_name} />
+            </div>
+
+            <p className="text-2xl font-bold text-maroon mb-1">₦{Number(result.fee).toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mb-5">One-time fee to view this semester\u2019s result</p>
+
+            {payError && <p className="text-red-600 text-xs mb-3">{payError}</p>}
+
+            <button
+              onClick={payNow}
+              disabled={paying}
+              className="w-full bg-maroon hover:bg-maroon-light text-white py-3 rounded font-semibold text-sm disabled:opacity-60"
+            >
+              {paying ? 'Redirecting to payment…' : `Pay ₦${Number(result.fee).toLocaleString()} to View Result`}
+            </button>
+            <p className="text-[11px] text-gray-400 mt-3">Payments are processed securely by Flutterwave.</p>
+          </div>
+        )}
+
+        {result && !result.locked && (
           <div className="print-area bg-white max-w-4xl mx-auto shadow p-8 border rounded">
             <div className="flex items-center gap-4 border-b-2 border-maroon pb-4 mb-4">
               <Logo size={64} />

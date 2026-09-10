@@ -10,6 +10,7 @@ const NAV = {
     { to: '/super-admin/courses', label: 'Courses' },
     { to: '/super-admin/results-approval', label: 'Result Approval' },
     { to: '/super-admin/published-results', label: 'Published Results' },
+    { to: '/super-admin/payments', label: 'Payments' },
     { to: '/super-admin/reports', label: 'Reports' },
     { to: '/super-admin/audit-logs', label: 'Audit Logs' },
     { to: '/change-password', label: 'Change Password' },

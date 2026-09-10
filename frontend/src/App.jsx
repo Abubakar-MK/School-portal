@@ -10,6 +10,7 @@ import ChangePasswordPage from './pages/auth/ChangePasswordPage';
 
 import StudentDashboard from './pages/student/StudentDashboard';
 import CurrentResultPage from './pages/student/CurrentResultPage';
+import PaymentCallbackPage from './pages/student/PaymentCallbackPage';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
 import RegisterStudentPage from './pages/admin/RegisterStudentPage';
@@ -23,6 +24,7 @@ import AcademicStructurePage from './pages/superadmin/AcademicStructurePage';
 import CoursesPage from './pages/superadmin/CoursesPage';
 import ResultApprovalPage from './pages/superadmin/ResultApprovalPage';
 import PublishedResultsPage from './pages/superadmin/PublishedResultsPage';
+import PaymentsPage from './pages/superadmin/PaymentsPage';
 import ReportsPage from './pages/superadmin/ReportsPage';
 import AuditLogsPage from './pages/superadmin/AuditLogsPage';
 
@@ -54,6 +56,7 @@ export default function App() {
       <Route element={<ProtectedRoute allowedRoles={['student']} />}>
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/current-result" element={<CurrentResultPage />} />
+        <Route path="/student/payment-callback" element={<PaymentCallbackPage />} />
       </Route>
 
       {/* Admin */}
@@ -78,6 +81,7 @@ export default function App() {
         <Route path="/super-admin/courses" element={<CoursesPage />} />
         <Route path="/super-admin/results-approval" element={<ResultApprovalPage />} />
         <Route path="/super-admin/published-results" element={<PublishedResultsPage />} />
+        <Route path="/super-admin/payments" element={<PaymentsPage />} />
         <Route path="/super-admin/reports" element={<ReportsPage />} />
         <Route path="/super-admin/audit-logs" element={<AuditLogsPage />} />
       </Route>

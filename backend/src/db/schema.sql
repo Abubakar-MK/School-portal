@@ -159,6 +159,12 @@ CREATE TABLE results (
   reviewed_at       TIMESTAMPTZ,
   rejection_reason  TEXT,
   published_at      TIMESTAMPTZ,
+  -- Whether the student may currently VIEW this published result. Set
+  -- automatically once a payment for it is verified successful, or
+  -- manually by a Super Admin (e.g. to fix a payment problem). Has no
+  -- meaning before the result is published — there is nothing to pay
+  -- to view yet.
+  access_granted    BOOLEAN NOT NULL DEFAULT false,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (student_id, session_id, semester_id)
@@ -181,6 +187,27 @@ CREATE TABLE result_entries (
   remark        VARCHAR(30),
   UNIQUE (result_id, course_id)
 );
+
+-- ---------- RESULT VIEWING PAYMENTS ----------
+-- Every payment attempt a student makes to unlock viewing one specific
+-- published result. Multiple rows per result are normal (a failed
+-- attempt followed by a successful retry) — this is a history log,
+-- not a single record; the actual "can they view it" flag lives on
+-- results.access_granted.
+CREATE TABLE payments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  result_id     UUID NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+  student_id    UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  reference     VARCHAR(100) UNIQUE NOT NULL,
+  amount        NUMERIC(10,2) NOT NULL,
+  status        VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, success, failed
+  gateway       VARCHAR(20) NOT NULL DEFAULT 'flutterwave',
+  gateway_raw   JSONB,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  verified_at   TIMESTAMPTZ
+);
+CREATE INDEX idx_payments_result ON payments(result_id);
+CREATE INDEX idx_payments_student ON payments(student_id);
 
 -- ---------- AUDIT LOGS ----------
 CREATE TABLE audit_logs (

@@ -10,6 +10,7 @@ router.get('/verify/:reference', ctrl.verifyPayment);
 
 // Super Admin oversight of every payment attempt, and manual overrides.
 router.get('/', requireRole('super_admin'), ctrl.listPayments);
+router.delete('/:id', requireRole('super_admin'), ctrl.deletePayment);
 router.post('/results/:resultId/grant-access', requireRole('super_admin'), ctrl.grantAccess);
 router.post('/results/:resultId/revoke-access', requireRole('super_admin'), ctrl.revokeAccess);
 

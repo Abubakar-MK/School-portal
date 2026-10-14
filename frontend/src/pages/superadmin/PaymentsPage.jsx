@@ -44,6 +44,18 @@ export default function PaymentsPage() {
     }
   };
 
+  const deletePayment = async (p) => {
+    if (!window.confirm(`Permanently delete this payment record for ${p.first_name} ${p.last_name}? This cannot be undone.`)) return;
+    setError(''); setMessage('');
+    try {
+      await api.delete(`/payments/${p.id}`);
+      setMessage('Payment record deleted.');
+      load();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not delete payment record.');
+    }
+  };
+
   return (
     <DashboardLayout subtitle="Super Admin Portal">
       <Header title="Payments" />
@@ -94,11 +106,14 @@ export default function PaymentsPage() {
                   <Td>{new Date(p.created_at).toLocaleString()}</Td>
                   <Td>{p.access_granted ? 'Granted' : 'Locked'}</Td>
                   <Td>
-                    {!p.access_granted ? (
-                      <button onClick={() => grantAccess(p)} className="text-maroon underline text-xs">Grant Access</button>
-                    ) : (
-                      <button onClick={() => revokeAccess(p)} className="text-red-600 underline text-xs">Revoke Access</button>
-                    )}
+                    <div className="flex flex-col gap-1 items-start">
+                      {!p.access_granted ? (
+                        <button onClick={() => grantAccess(p)} className="text-maroon underline text-xs">Grant Access</button>
+                      ) : (
+                        <button onClick={() => revokeAccess(p)} className="text-red-600 underline text-xs">Revoke Access</button>
+                      )}
+                      <button onClick={() => deletePayment(p)} className="text-red-600 underline text-xs">Delete</button>
+                    </div>
                   </Td>
                 </tr>
               ))}
